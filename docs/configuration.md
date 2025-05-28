@@ -1167,7 +1167,7 @@ Example:
   shortcuts:
     - title: Gmail
       url: https://mail.google.com
-      shortcut: gm
+      alias: gm
     - title: GitHub
       url: https://github.com
   bangs:
