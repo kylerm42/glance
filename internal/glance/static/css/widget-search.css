@@ -139,20 +139,6 @@
     color: var(--color-primary);
 }
 
-.search-shortcut-item.exact-match:hover,
-.search-shortcut-item.exact-match.highlighted {
-    filter: brightness(110%);
-}
-
-.search-shortcut-item.exact-match .search-shortcut-title,
-.search-shortcut-item.exact-match .search-shortcut-url {
-    color: var(--color-text-subdue);
-}
-
-.search-shortcut-item.exact-match .search-shortcut-icon {
-    stroke: var(--color-text-subdue);
-}
-
 .search-shortcut-icon {
     width: 1.2rem;
     height: 1.2rem;
