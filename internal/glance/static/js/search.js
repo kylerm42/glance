@@ -37,18 +37,55 @@ export default function SearchBox(widget) {
         });
     }
 
-    // Simple fuzzy matching function
+    // URL detection function
+    function isUrl(input) {
+        const trimmed = input.trim();
+
+        // Check for protocol-prefixed URLs
+        if (/^https?:\/\/.+/.test(trimmed)) {
+            return trimmed;
+        }
+
+        // Check for IP addresses with optional port
+        if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/.test(trimmed)) {
+            return `http://${trimmed}`;
+        }
+
+        // Check for domain patterns (including localhost)
+        if (/^(www\.)?[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z]{2,})+$/.test(trimmed) ||
+            /^localhost(:\d+)?$/.test(trimmed)) {
+            return `https://${trimmed}`;
+        }
+
+        // Check for domain with port (like example.com:8080)
+        if (/^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z]{2,})+:\d+$/.test(trimmed)) {
+            return `https://${trimmed}`;
+        }
+
+        return null;
+    }
+
+    // Fuzzy matching function
     function fuzzyMatch(text, query) {
         const lowerText = text.toLowerCase();
         const lowerQuery = query.toLowerCase();
 
         // Exact match gets highest priority
         if (lowerText === lowerQuery) return { score: 1000, type: 'exact' };
-        if (lowerText.includes(lowerQuery)) return { score: 500, type: 'contains' };
 
-        // Simple fuzzy matching
+        // Check for substring matches with position-based scoring
+        const substringIndex = lowerText.indexOf(lowerQuery);
+        if (substringIndex !== -1) {
+            // Higher score for matches at the beginning
+            const positionBonus = Math.max(0, 100 - substringIndex * 5);
+            return { score: 500 + positionBonus, type: 'contains' };
+        }
+
+        // Fuzzy matching with position-aware scoring
         let score = 0;
         let textIndex = 0;
+        let consecutiveMatches = 0;
+        let firstMatchIndex = -1;
 
         for (let i = 0; i < lowerQuery.length; i++) {
             const char = lowerQuery[i];
@@ -56,12 +93,31 @@ export default function SearchBox(widget) {
 
             if (foundIndex === -1) return { score: 0, type: 'none' };
 
+            // Track first match position
+            if (firstMatchIndex === -1) {
+                firstMatchIndex = foundIndex;
+            }
+
             // Bonus for consecutive characters
-            if (foundIndex === textIndex) score += 10;
-            else score += 1;
+            if (foundIndex === textIndex) {
+                consecutiveMatches++;
+                score += 15; // Higher bonus for consecutive chars
+            } else {
+                consecutiveMatches = 0;
+                score += 2;
+            }
+
+            // Extra bonus for consecutive streaks
+            if (consecutiveMatches > 1) {
+                score += consecutiveMatches * 3;
+            }
 
             textIndex = foundIndex + 1;
         }
+
+        // Position bonus: higher score for matches starting earlier
+        const positionBonus = Math.max(0, 50 - firstMatchIndex * 3);
+        score += positionBonus;
 
         return { score, type: 'fuzzy' };
     }
@@ -97,7 +153,8 @@ export default function SearchBox(widget) {
                 isExact: titleMatch.type === 'exact' || aliasMatch.type === 'exact'
             };
         }).filter(item => item.score > 0)
-          .sort((a, b) => b.score - a.score);
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 5);
 
         // Start with shortcuts
         filteredResults = [...shortcutMatches];
@@ -149,7 +206,7 @@ export default function SearchBox(widget) {
                             <div class="search-shortcut-title">${item.title}</div>
                             <div class="search-shortcut-url hide-on-mobile">${item.url}</div>
                         </div>
-                        ${item.alias ? `<div class="search-shortcut-shortcut">${item.alias}</div>` : ''}
+                        ${item.alias ? `<div class="search-shortcut-alias">${item.alias}</div>` : ''}
                     </div>
                 `;
             } else {
@@ -175,6 +232,32 @@ export default function SearchBox(widget) {
         });
     }
 
+    function showErrorIndicator() {
+        // Find the widget header in the parent widget container
+        const widgetContainer = widget.closest('.widget');
+        const widgetHeader = widgetContainer?.querySelector('.widget-header');
+
+        if (!widgetHeader) return;
+
+        // Check if error indicator already exists
+        if (widgetHeader.querySelector('.notice-icon-major')) {
+            return;
+        }
+
+        const errorIndicator = document.createElement('div');
+        errorIndicator.className = 'notice-icon notice-icon-major';
+        errorIndicator.title = 'Search suggestions service error';
+        widgetHeader.appendChild(errorIndicator);
+    }
+
+    function hideErrorIndicator() {
+        const widgetContainer = widget.closest('.widget');
+        const errorIndicator = widgetContainer?.querySelector('.widget-header .notice-icon-major');
+        if (errorIndicator) {
+            errorIndicator.remove();
+        }
+    }
+
     async function fetchSuggestions(query) {
         try {
             const response = await fetch(`/api/search/suggestions?query=${encodeURIComponent(query)}&widget_id=${encodeURIComponent(widgetId)}`, {
@@ -182,13 +265,18 @@ export default function SearchBox(widget) {
             });
 
             if (!response.ok) {
+                showErrorIndicator();
                 return [];
             }
+
+            // Clear error indicator on successful response
+            hideErrorIndicator();
 
             const data = await response.json();
             return data.suggestions || [];
         } catch (error) {
             console.error('Failed to fetch suggestions:', error);
+            showErrorIndicator();
             return [];
         }
     }
@@ -284,6 +372,19 @@ export default function SearchBox(widget) {
 
             if (exactMatch) {
                 navigateToShortcut(exactMatch);
+                return;
+            }
+
+            // Check if input is a URL
+            const detectedUrl = isUrl(input);
+            if (detectedUrl) {
+                if (newTab) {
+                    window.open(detectedUrl, target).focus();
+                } else {
+                    window.location.href = detectedUrl;
+                }
+                inputElement.value = "";
+                hideDropdown();
                 return;
             }
 

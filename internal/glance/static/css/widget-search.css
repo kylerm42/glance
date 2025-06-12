@@ -115,10 +115,15 @@
     opacity: 0.8;
 }
 
-.search-shortcut-item:hover .search-shortcut-shortcut,
-.search-shortcut-item.highlighted .search-shortcut-shortcut {
+.search-shortcut-item:hover .search-shortcut-alias,
+.search-shortcut-item.highlighted .search-shortcut-alias {
     background: rgba(255, 255, 255, 0.2);
     color: var(--color-text-highlight);
+}
+
+.search-shortcut-item.exact-match .search-shortcut-alias{
+    background: var(--color-primary);
+    color: var(--color-background);
 }
 
 .search-shortcut-item:hover .search-shortcut-icon,
@@ -127,8 +132,11 @@
 }
 
 .search-shortcut-item.exact-match {
-    background: var(--color-primary);
-    color: var(--color-text-subdue);
+    background: var(--color-widget-background-highlight);
+}
+
+.search-shortcut-item.exact-match .search-shortcut-title {
+    color: var(--color-primary);
 }
 
 .search-shortcut-item.exact-match:hover,
@@ -174,7 +182,7 @@
     max-width: 300px;
 }
 
-.search-shortcut-shortcut {
+.search-shortcut-alias {
     font-size: 0.8em;
     color: var(--color-text-base);
     background: var(--color-widget-background-highlight);
